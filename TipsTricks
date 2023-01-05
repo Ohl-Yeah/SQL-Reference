@@ -1,0 +1,96 @@
+
+------
+SELECT COUNT(*) FROM CompanyH.dbo.InvMaster
+-----
+,DATEDIFF(DD,[JobTenderDate],[ActCompleteDate]) as JobDuration
+
+--------------------------
+-- CTE SAMPLES
+--------------------------
+
+WITH AR AS (SELECT --TOP 10
+				SalesOrder
+				,StockCode as TransactionStockCode
+				,CASE WHEN LEN(StockCode) > 0 AND LEFT(StockCode,2)='CU' THEN CONCAT('C',RIGHT(StockCode, LEN(StockCode)-2)) ELSE StockCode END as StockCode
+				--,*
+			FROM CompanyH.dbo.ArTrnDetail
+			WHERE LineType IN (1,7)
+			),
+	IM as (SELECT --TOP 10
+				StockCode
+				,ProductClass
+				,UserField5 as ProductStatus
+			FROM CompanyH.dbo.[InvMaster]
+			),
+	IM_ as (SELECT --TOP 10
+				StockCode
+				,ProductFamily
+				,Mechanism
+			FROM CompanyH.dbo.[InvMaster+]
+			)
+
+SELECT TOP 1000
+	AR.*
+	,IM_.ProductFamily
+	,IM.ProductClass
+	,IM_.Mechanism
+	,IM.ProductStatus
+FROM AR
+LEFT JOIN IM_ on AR.StockCode = IM_.StockCode
+LEFT JOIN IM on AR.StockCode = IM.StockCode
+WHERE 
+	LEFT(AR.StockCode,1) = 'C'
+	AND Mechanism IS Null
+
+ORDER BY SalesOrder DESC
+
+
+-----////////////////-------------
+---- SAMPLE CODE - REFERENCE ONLY
+-----\\\\\\\\\\\\\\\--------------
+USE CompanyH
+
+------------------------------------------------------
+--------------- Parent Assignement -------------------
+------------------------------------------------------
+SELECT i.StockCode, i.Warehouse, i.UserField1
+FROM dbo.InvWarehouse i WITH (NOLOCK)
+
+WHERE i.StockCode IN --('4600DLC') 
+	('185SBK' )--'15500','185SBK','3300','3300BK')
+	AND i.Warehouse IN ('F','G')
+ORDER BY StockCode
+
+------------------------------------------------------
+----------- Component by Parent Assignement ----------
+------------------------------------------------------
+SELECT 
+	i.StockCode
+	,i.Warehouse
+	,i.UserField1
+	,b.Component
+	,m.Description
+	,c.Warehouse as CompWarehouse
+	,c.UserField1 as CompUserField1
+	--,* 
+FROM dbo.InvWarehouse i WITH (NOLOCK)
+JOIN dbo.BomStructure b on i.StockCode = b.ParentPart
+JOIN dbo.InvWarehouse c on b.Component = c.StockCode
+JOIN dbo.InvMaster m on c.StockCode = m.StockCode
+
+WHERE i.StockCode IN --('4600DLC') 
+	('185SBK' )--'15500','185SBK','3300','3300BK')
+	AND i.Warehouse IN ('F','G')
+	AND c.Warehouse in ('P','C')
+ORDER BY StockCode
+
+----------------------------------------------------
+-------- Parents of Component Validation -----------
+----------------------------------------------------
+SELECT Component, ParentPart, UserField1
+FROM dbo.BomStructure s
+JOIN dbo.InvWarehouse w on w.StockCode = s.ParentPart
+WHERE Component = --'100550' 
+	'983158'
+	AND UserField1 <> ''
+ORDER BY UserField1
